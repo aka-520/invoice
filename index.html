@@ -430,23 +430,68 @@ html, body { height: 100%; font-family: 'Segoe UI', 'Microsoft JhengHei', sans-s
 
 /* ===== Keyboard hints bar ===== */
 .key-hints-bar {
-  padding: 6px 20px;
-  background: #f8fafc;
+  padding: 5px 16px;
+  background: #f1f5f9;
   border-top: 1px solid var(--border);
-  font-size: 11px; color: var(--muted);
+  font-size: 10.5px; color: var(--muted);
   display: flex; align-items: center; gap: 2px; flex-wrap: wrap;
+  line-height: 1.9;
 }
 kbd {
   display: inline-block;
   background: var(--card); color: var(--navy);
-  border: 1.5px solid var(--border);
+  border: 1.5px solid #b0bfd4;
   border-bottom-width: 3px;
   border-radius: 4px;
-  padding: 1px 6px; font-size: 11px;
-  font-family: monospace; font-weight: 600;
-  box-shadow: 0 1px 0 rgba(0,0,0,.1);
+  padding: 0 5px; font-size: 10px;
+  font-family: 'Cascadia Code', 'Consolas', monospace; font-weight: 700;
+  box-shadow: 0 1px 0 rgba(0,0,0,.12);
+  white-space: nowrap;
 }
-.hint-auto-save { color: var(--success); font-weight: 600; }
+.hint-auto-save { color: var(--success); font-weight: 700; }
+
+/* ===== Shortcuts Help Modal ===== */
+.help-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(10,20,50,.75); z-index: 1100;
+  align-items: center; justify-content: center;
+}
+.help-overlay.open { display: flex; }
+.help-card {
+  background: var(--card); border-radius: 14px;
+  padding: 28px 32px; width: 680px; max-width: 96vw;
+  box-shadow: 0 20px 60px rgba(0,0,0,.35);
+  max-height: 90vh; overflow-y: auto;
+}
+.help-card h2 { font-size: 17px; font-weight: 700; color: var(--navy); margin-bottom: 20px; }
+.help-close {
+  float: right; cursor: pointer; font-size: 20px;
+  color: var(--muted); line-height: 1;
+  background: none; border: none; padding: 0;
+}
+.shortcut-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 0 24px;
+}
+.shortcut-section { margin-bottom: 18px; }
+.shortcut-section h3 {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--muted);
+  margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 4px;
+}
+.shortcut-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 5px 0; font-size: 13px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.shortcut-row .sc-desc { color: var(--text); }
+.shortcut-keys { display: flex; gap: 3px; align-items: center; }
+.shortcut-tip {
+  margin-top: 14px; padding: 10px 14px;
+  background: #eff6ff; border-radius: 8px;
+  font-size: 12px; color: #1d4ed8;
+  border-left: 3px solid var(--accent);
+}
 /* ===== Scrollbar global ===== */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -625,10 +670,16 @@ kbd {
             <button class="btn btn-success" onclick="exportExcel()">📊 匯出 Excel</button>
           </div>
           <div class="key-hints-bar">
-            <kbd>PageUp</kbd> 上一張 &nbsp;·&nbsp;
+            <kbd>Tab</kbd> 下一欄 &nbsp;·&nbsp;
+            <kbd>Shift</kbd>+<kbd>Tab</kbd> 上一欄 &nbsp;·&nbsp;
             <kbd>PageDown</kbd> 下一張 &nbsp;·&nbsp;
+            <kbd>PageUp</kbd> 上一張 &nbsp;·&nbsp;
             <kbd>Home</kbd> 第一張 &nbsp;·&nbsp;
             <kbd>End</kbd> 最後一張 &nbsp;·&nbsp;
+            <kbd>Esc</kbd> 還原欄位 &nbsp;·&nbsp;
+            <kbd>Ctrl</kbd>+<kbd>E</kbd> 匯出 &nbsp;·&nbsp;
+            <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> 全部還原 &nbsp;·&nbsp;
+            <kbd>F1</kbd> 說明 &nbsp;·&nbsp;
             <span class="hint-auto-save">✦ 修改後自動儲存</span>
           </div>
         </div>
@@ -641,6 +692,52 @@ kbd {
 <!-- Modal Zoom -->
 <div class="modal-overlay" id="modalOverlay" onclick="closeModal()">
   <img class="modal-img" id="modalImg" src="" alt="">
+</div>
+
+<!-- Shortcuts Help -->
+<div class="help-overlay" id="helpOverlay" onclick="if(event.target===this)toggleHelp()">
+  <div class="help-card">
+    <button class="help-close" onclick="toggleHelp()">&#x2715;</button>
+    <h2>&#9881; 鍵盤快捷鍵說明</h2>
+    <div class="shortcut-grid">
+      <div class="shortcut-section">
+        <h3>📄 發票導覽</h3>
+        <div class="shortcut-row"><span class="sc-desc">下一張發票</span><span class="shortcut-keys"><kbd>PageDown</kbd></span></div>
+        <div class="shortcut-row"><span class="sc-desc">上一張發票</span><span class="shortcut-keys"><kbd>PageUp</kbd></span></div>
+        <div class="shortcut-row"><span class="sc-desc">第一張</span><span class="shortcut-keys"><kbd>Home</kbd></span></div>
+        <div class="shortcut-row"><span class="sc-desc">最後一張</span><span class="shortcut-keys"><kbd>End</kbd></span></div>
+        <div class="shortcut-row"><span class="sc-desc">最後欄位Tab自動跳下張</span><span class="shortcut-keys"><kbd>Tab</kbd></span></div>
+        <div class="shortcut-row"><span class="sc-desc">第一欄位Shift+Tab跳上張</span><span class="shortcut-keys"><kbd>Shift</kbd>+<kbd>Tab</kbd></span></div>
+      </div>
+      <div class="shortcut-section">
+        <h3>&#9998; 欄位編輯</h3>
+        <div class="shortcut-row"><span class="sc-desc">下一個欄位</span><span class="shortcut-keys"><kbd>Tab</kbd></span></div>
+        <div class="shortcut-row"><span class="sc-desc">上一個欄位</span><span class="shortcut-keys"><kbd>Shift</kbd>+<kbd>Tab</kbd></span></div>
+        <div class="shortcut-row"><span class="sc-desc">還原目前欄位</span><span class="shortcut-keys"><kbd>Esc</kbd></span></div>
+        <div class="shortcut-row"><span class="sc-desc">還原全部欄位</span><span class="shortcut-keys"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd></span></div>
+      </div>
+      <div class="shortcut-section">
+        <h3>&#128190; 其他功能</h3>
+        <div class="shortcut-row"><span class="sc-desc">匯出 Excel</span><span class="shortcut-keys"><kbd>Ctrl</kbd>+<kbd>E</kbd></span></div>
+        <div class="shortcut-row"><span class="sc-desc">關閉放大 / 說明</span><span class="shortcut-keys"><kbd>Esc</kbd></span></div>
+        <div class="shortcut-row"><span class="sc-desc">開啟鍵盤說明</span><span class="shortcut-keys"><kbd>F1</kbd> &nbsp;或&nbsp; <kbd>?</kbd></span></div>
+      </div>
+      <div class="shortcut-section">
+        <h3>&#128161; 快速流程</h3>
+        <div class="shortcut-row" style="flex-direction:column;align-items:flex-start;gap:4px;">
+          <span style="font-size:12px;color:var(--muted);line-height:1.6">
+            1.進入比對畫面後自動聚焦第一欄<br>
+            2. 依序 <kbd>Tab</kbd> 透過 11 個欄位<br>
+            3. 最後一欄按 <kbd>Tab</kbd> 自動改為下一張<br>
+            4. 重複直到完成，按 <kbd>Ctrl</kbd>+<kbd>E</kbd> 匯出
+          </span>
+        </div>
+      </div>
+    </div>
+    <div class="shortcut-tip">
+      ★ 修改內容即時自動儲存，不需要手動按儲存按鈕。
+    </div>
+  </div>
 </div>
 
 <!-- Toast container -->
@@ -1199,16 +1296,67 @@ function openModal(src) {
 function closeModal() {
   document.getElementById('modalOverlay').classList.remove('open');
 }
+function toggleHelp() {
+  document.getElementById('helpOverlay').classList.toggle('open');
+}
+
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeModal(); return; }
+  // --- 關閉模態 ---
+  if (e.key === 'Escape') {
+    if (document.getElementById('helpOverlay').classList.contains('open'))  { toggleHelp(); return; }
+    if (document.getElementById('modalOverlay').classList.contains('open')) { closeModal(); return; }
+    // 還原目前聚焦欄位的辨識小字
+    const focused = document.activeElement;
+    if (focused && focused.dataset && focused.dataset.key) {
+      e.preventDefault();
+      resetField(focused.dataset.key);
+      focused.focus();
+    }
+    return;
+  }
+
   if (!document.getElementById('screen-review').classList.contains('active')) return;
-  // 追蹤目前焦點欄位
+
   const focused = document.activeElement;
-  if (focused && focused.dataset && focused.dataset.key) lastFocusedKey = focused.dataset.key;
-  // 若焦點不在任何 input，自動聚焦第一個欄位（按非導覽鍵時）
+  const inField = focused && focused.dataset && focused.dataset.key;
+  if (inField) lastFocusedKey = focused.dataset.key;
+
+  // --- F1 / ? 說明面板 ---
+  if (e.key === 'F1' || (e.key === '?' && !inField)) {
+    e.preventDefault(); toggleHelp(); return;
+  }
+
+  // --- Ctrl 組合鍵 ---
+  if (e.ctrlKey) {
+    if (e.key === 'e' || e.key === 'E') { e.preventDefault(); exportExcel(); return; }
+    if ((e.key === 'r' || e.key === 'R') && e.shiftKey) { e.preventDefault(); resetCurrentEdit(); return; }
+    return; // 其他 Ctrl 組合不擋動
+  }
+
+  // --- Tab 最後/第一欄位 自動跳張 ---
+  const firstKey = FIELDS[0].key;
+  const lastKey  = FIELDS[FIELDS.length - 1].key;
+  if (e.key === 'Tab' && !e.shiftKey && inField && focused.dataset.key === lastKey) {
+    e.preventDefault();
+    lastFocusedKey = firstKey;
+    navigate(1);
+    return;
+  }
+  if (e.key === 'Tab' && e.shiftKey && inField && focused.dataset.key === firstKey) {
+    e.preventDefault();
+    lastFocusedKey = lastKey;
+    navigate(-1);
+    return;
+  }
+
+  // --- 頁面導覽 ---
   const navKeys = ['PageUp','PageDown','Home','End'];
-  if (!navKeys.includes(e.key) && (!focused || !focused.dataset.key)) {
-    focusField('invoiceNo'); return;
+  if (!navKeys.includes(e.key) && !inField) {
+    // 無焦點時任意鍵就自動聚焦第一欄
+    if (!e.ctrlKey && !e.altKey && !e.metaKey && e.key.length === 1) {
+      focusField('invoiceNo');
+    }
+    return;
   }
   if (e.key === 'PageUp')   { e.preventDefault(); navigate(-1); }
   if (e.key === 'PageDown') { e.preventDefault(); navigate(1); }
