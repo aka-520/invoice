@@ -428,6 +428,25 @@ html, body { height: 100%; font-family: 'Segoe UI', 'Microsoft JhengHei', sans-s
 .toast.warning { background: #b45309; }
 @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
 
+/* ===== Keyboard hints bar ===== */
+.key-hints-bar {
+  padding: 6px 20px;
+  background: #f8fafc;
+  border-top: 1px solid var(--border);
+  font-size: 11px; color: var(--muted);
+  display: flex; align-items: center; gap: 2px; flex-wrap: wrap;
+}
+kbd {
+  display: inline-block;
+  background: var(--card); color: var(--navy);
+  border: 1.5px solid var(--border);
+  border-bottom-width: 3px;
+  border-radius: 4px;
+  padding: 1px 6px; font-size: 11px;
+  font-family: monospace; font-weight: 600;
+  box-shadow: 0 1px 0 rgba(0,0,0,.1);
+}
+.hint-auto-save { color: var(--success); font-weight: 600; }
 /* ===== Scrollbar global ===== */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -603,8 +622,14 @@ html, body { height: 100%; font-family: 'Segoe UI', 'Microsoft JhengHei', sans-s
             <span class="record-indicator" id="recordIndicator">—</span>
             <button class="btn btn-secondary" id="btnPrev2" onclick="navigate(-1)">◀ 上一張</button>
             <button class="btn btn-secondary" id="btnNext2" onclick="navigate(1)">下一張 ▶</button>
-            <button class="btn btn-primary" onclick="saveCurrentEdit()">💾 儲存修改</button>
             <button class="btn btn-success" onclick="exportExcel()">📊 匯出 Excel</button>
+          </div>
+          <div class="key-hints-bar">
+            <kbd>PageUp</kbd> 上一張 &nbsp;·&nbsp;
+            <kbd>PageDown</kbd> 下一張 &nbsp;·&nbsp;
+            <kbd>Home</kbd> 第一張 &nbsp;·&nbsp;
+            <kbd>End</kbd> 最後一張 &nbsp;·&nbsp;
+            <span class="hint-auto-save">✦ 修改後自動儲存</span>
           </div>
         </div>
       </div>
@@ -891,7 +916,7 @@ async function startProcessing() {
   currentIndex = 0;
   buildThumbStrip();
   goToScreen('review');
-  renderReview(currentIndex);
+  renderReview(currentIndex, true);
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -906,7 +931,7 @@ function buildThumbStrip() {
     const div = document.createElement('div');
     div.className = 'strip-thumb';
     div.id = `thumb-${i}`;
-    div.onclick = () => { saveCurrentEdit(); currentIndex = i; renderReview(i); };
+    div.onclick = () => { saveCurrentEdit(); currentIndex = i; renderReview(i, true); };
     div.innerHTML = `
       <img src="${inv.imageUrl}" alt="${inv.file.name}">
       <div class="status-dot ${inv.status}"></div>
@@ -916,7 +941,15 @@ function buildThumbStrip() {
   });
 }
 
-function renderReview(idx) {
+// lastFocusedKey：追蹤目前焦點欄位，切換發票後恢復到同欄位
+let lastFocusedKey = 'invoiceNo';
+
+function focusField(key) {
+  const el = document.getElementById(`field-${key || lastFocusedKey || 'invoiceNo'}`);
+  if (el) { el.focus(); el.select(); }
+}
+
+function renderReview(idx, resetFocus) {
   if (invoices.length === 0) return;
   const inv = invoices[idx];
   currentIndex = idx;
@@ -951,6 +984,8 @@ function renderReview(idx) {
   document.getElementById('btnNext').disabled = idx === invoices.length - 1;
   document.getElementById('btnPrev2').disabled = idx === 0;
   document.getElementById('btnNext2').disabled = idx === invoices.length - 1;
+  // 自動聚焦：切換時回到上次焦點欄位（或第一個欄位）
+  setTimeout(() => focusField(resetFocus ? 'invoiceNo' : lastFocusedKey), 50);
 
   // Record indicator
   const modCount = invoices.filter(v => v.modified).length;
@@ -990,7 +1025,8 @@ function renderForm(inv) {
                data-key="${f.key}"
                value="${escHtml(editedVal)}" 
                ${failHint}
-               oninput="onFieldInput(this)">
+               oninput="onFieldInput(this)"
+               onfocus="lastFocusedKey=this.dataset.key">
         ${isModified ? `<span class="diff-badge">已修改</span>` : ''}
       </div>
       ${compareRow}
@@ -1015,6 +1051,20 @@ function onFieldInput(input) {
     b.className = 'diff-badge'; b.textContent = '已修改';
     wrap.appendChild(b);
   } else if (!isModified && badge) badge.remove();
+  // 自動儲存：即時更新 modified 旗標與縮圖徽章
+  inv.modified = FIELDS.some(f => inv.editedData[f.key] !== inv.ocrData[f.key]);
+  const thumb = document.getElementById(`thumb-${idx}`);
+  if (thumb) {
+    let tbadge = thumb.querySelector('.modified-badge');
+    if (inv.modified && !tbadge) {
+      tbadge = document.createElement('div');
+      tbadge.className = 'modified-badge'; tbadge.textContent = '已改';
+      thumb.appendChild(tbadge);
+    } else if (!inv.modified && tbadge) tbadge.remove();
+  }
+  const modCount = invoices.filter(v => v.modified).length;
+  document.getElementById('recordIndicator').innerHTML =
+    `第 <strong>${currentIndex + 1}</strong> / <strong>${invoices.length}</strong> 張\u3000已修改：<strong>${modCount}</strong> 張`;
 }
 
 function resetField(key) {
@@ -1066,6 +1116,12 @@ function navigate(dir) {
   const next = currentIndex + dir;
   if (next < 0 || next >= invoices.length) return;
   renderReview(next);
+}
+function navigateTo(idx) {
+  saveCurrentEdit();
+  if (idx < 0) idx = 0;
+  if (idx >= invoices.length) idx = invoices.length - 1;
+  renderReview(idx);
 }
 
 // ===================================================================
@@ -1144,11 +1200,20 @@ function closeModal() {
   document.getElementById('modalOverlay').classList.remove('open');
 }
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeModal();
-  if (document.getElementById('screen-review').classList.contains('active')) {
-    if (e.key === 'ArrowLeft') navigate(-1);
-    if (e.key === 'ArrowRight') navigate(1);
+  if (e.key === 'Escape') { closeModal(); return; }
+  if (!document.getElementById('screen-review').classList.contains('active')) return;
+  // 追蹤目前焦點欄位
+  const focused = document.activeElement;
+  if (focused && focused.dataset && focused.dataset.key) lastFocusedKey = focused.dataset.key;
+  // 若焦點不在任何 input，自動聚焦第一個欄位（按非導覽鍵時）
+  const navKeys = ['PageUp','PageDown','Home','End'];
+  if (!navKeys.includes(e.key) && (!focused || !focused.dataset.key)) {
+    focusField('invoiceNo'); return;
   }
+  if (e.key === 'PageUp')   { e.preventDefault(); navigate(-1); }
+  if (e.key === 'PageDown') { e.preventDefault(); navigate(1); }
+  if (e.key === 'Home')     { e.preventDefault(); navigateTo(0); }
+  if (e.key === 'End')      { e.preventDefault(); navigateTo(invoices.length - 1); }
 });
 
 // ===================================================================
