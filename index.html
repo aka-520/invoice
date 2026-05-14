@@ -271,6 +271,12 @@ html, body { height: 100%; font-family: 'Segoe UI', 'Microsoft JhengHei', sans-s
   font-size: 8px; padding: 0 3px; border-radius: 3px;
   font-weight: 700;
 }
+.strip-thumb .confirmed-badge {
+  position: absolute; bottom: 2px; right: 2px;
+  background: var(--success); color: #fff;
+  font-size: 8px; padding: 0 3px; border-radius: 3px;
+  font-weight: 700;
+}
 .status-dot.success { background: var(--success); }
 .status-dot.partial { background: var(--partial); }
 .status-dot.failed { background: var(--danger); }
@@ -350,13 +356,17 @@ html, body { height: 100%; font-family: 'Segoe UI', 'Microsoft JhengHei', sans-s
 .form-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
 .form-grid {
-  display: grid; grid-template-columns: 1fr; gap: 10px;
+  display: grid; grid-template-columns: 1fr; gap: 6px;
 }
-.form-group { display: flex; flex-direction: column; gap: 4px; }
-.form-group.full { grid-column: 1/-1; }
+.form-group {
+  display: grid; grid-template-columns: 120px 1fr;
+  align-items: start; gap: 4px 8px;
+}
 .form-group label {
   font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .5px;
+  text-align: right; padding-top: 8px; white-space: nowrap;
 }
+.form-group .field-col { display: flex; flex-direction: column; gap: 2px; }
 .form-group .field-wrap { position: relative; }
 .form-input {
   width: 100%; padding: 8px 10px; border-radius: 7px;
@@ -393,6 +403,20 @@ html, body { height: 100%; font-family: 'Segoe UI', 'Microsoft JhengHei', sans-s
   grid-column: 1/-1; border: none; border-top: 1px solid var(--border); margin: 4px 0;
 }
 
+.confirm-bar {
+  padding: 10px 20px;
+  background: var(--card); border-top: 1px solid var(--border);
+  display: flex; justify-content: flex-end;
+}
+.btn-confirm {
+  background: var(--navy); color: #fff;
+  padding: 9px 36px; border-radius: 8px; border: none;
+  font-size: 14px; font-weight: 700; cursor: pointer;
+  transition: background .15s, box-shadow .15s;
+}
+.btn-confirm:hover { background: var(--navy-hover); box-shadow: 0 4px 12px rgba(15,32,68,.3); }
+.btn-confirm.confirmed { background: var(--success); }
+.btn-confirm.confirmed:hover { background: #16a34a; }
 .form-panel-footer {
   padding: 12px 20px;
   background: var(--card); border-top: 1px solid var(--border);
@@ -663,6 +687,9 @@ kbd {
             <div class="form-grid" id="formGrid">
               <!-- Dynamically rendered -->
             </div>
+          </div>
+          <div class="confirm-bar">
+            <button class="btn-confirm" id="btnConfirm" onclick="confirmCurrent()">✔ 確認此張</button>
           </div>
           <div class="key-hints-bar">
             <kbd>↑</kbd><kbd>↓</kbd> 上/下一欄 &nbsp;·&nbsp;
@@ -960,7 +987,7 @@ async function startProcessing() {
     const f = selectedFiles[i];
     document.getElementById('currentFile').textContent = `正在辨識：${f.name}`;
 
-    const delay = randomInt(600, 2400);
+    const delay = f._demoOcr ? randomInt(80, 200) : randomInt(600, 2400);
     await sleep(delay);
     processTimes.push(delay);
 
@@ -984,6 +1011,7 @@ async function startProcessing() {
       status,
       failedFields,
       modified: false,
+      confirmed: false,
     });
 
     if (status === 'success') cntSuccess++;
@@ -1039,6 +1067,7 @@ function buildThumbStrip() {
       <img src="${inv.imageUrl}" alt="${inv.file.name}">
       <div class="status-dot ${inv.status}"></div>
       ${inv.modified ? '<div class="modified-badge">已改</div>' : ''}
+      ${inv.confirmed ? '<div class="confirmed-badge">✔</div>' : ''}
     `;
     strip.appendChild(div);
   });
@@ -1091,9 +1120,15 @@ function renderReview(idx, resetFocus) {
   setTimeout(() => focusField(resetFocus ? 'invoiceNo' : lastFocusedKey), 50);
 
   // Record indicator
-  const modCount = invoices.filter(v => v.modified).length;
+  const confCount = invoices.filter(v => v.confirmed).length;
   document.getElementById('recordIndicator').innerHTML =
-    `第 <strong>${idx + 1}</strong> / <strong>${invoices.length}</strong> 張　已修改：<strong>${modCount}</strong> 張`;
+    `第 <strong>${idx + 1}</strong> / <strong>${invoices.length}</strong> 張　已確認：<strong>${confCount}</strong> 張`;
+  // Confirm button state
+  const btnConfirm = document.getElementById('btnConfirm');
+  if (btnConfirm) {
+    if (inv.confirmed) { btnConfirm.textContent = '✔ 已確認'; btnConfirm.classList.add('confirmed'); }
+    else { btnConfirm.textContent = '✔ 確認此張'; btnConfirm.classList.remove('confirmed'); }
+  }
 }
 
 function renderForm(inv) {
@@ -1122,17 +1157,19 @@ function renderForm(inv) {
 
     div.innerHTML = `
       <label>${f.label}${isFailed ? ' ⚠️' : ''}</label>
-      <div class="field-wrap">
-        <input class="form-input ${extraClass}" 
-               id="field-${f.key}" 
-               data-key="${f.key}"
-               value="${escHtml(editedVal)}" 
-               ${failHint}
-               oninput="onFieldInput(this)"
-               onfocus="lastFocusedKey=this.dataset.key">
-        ${isModified ? `<span class="diff-badge">已修改</span>` : ''}
+      <div class="field-col">
+        <div class="field-wrap">
+          <input class="form-input ${extraClass}" 
+                 id="field-${f.key}" 
+                 data-key="${f.key}"
+                 value="${escHtml(editedVal)}" 
+                 ${failHint}
+                 oninput="onFieldInput(this)"
+                 onfocus="lastFocusedKey=this.dataset.key">
+          ${isModified ? `<span class="diff-badge">已修改</span>` : ''}
+        </div>
+        ${compareRow}
       </div>
-      ${compareRow}
     `;
     grid.appendChild(div);
   });
@@ -1165,9 +1202,9 @@ function onFieldInput(input) {
       thumb.appendChild(tbadge);
     } else if (!inv.modified && tbadge) tbadge.remove();
   }
-  const modCount = invoices.filter(v => v.modified).length;
+  const confCount3 = invoices.filter(v => v.confirmed).length;
   document.getElementById('recordIndicator').innerHTML =
-    `第 <strong>${currentIndex + 1}</strong> / <strong>${invoices.length}</strong> 張\u3000已修改：<strong>${modCount}</strong> 張`;
+    `第 <strong>${currentIndex + 1}</strong> / <strong>${invoices.length}</strong> 張　已確認：<strong>${confCount3}</strong> 張`;
 }
 
 function resetField(key) {
@@ -1198,9 +1235,37 @@ function saveCurrentEdit() {
     } else if (!inv.modified && badge) badge.remove();
   }
   // Update record indicator
-  const modCount = invoices.filter(v => v.modified).length;
+  const confCount2 = invoices.filter(v => v.confirmed).length;
   document.getElementById('recordIndicator').innerHTML =
-    `第 <strong>${currentIndex + 1}</strong> / <strong>${invoices.length}</strong> 張　已修改：<strong>${modCount}</strong> 張`;
+    `第 <strong>${currentIndex + 1}</strong> / <strong>${invoices.length}</strong> 張　已確認：<strong>${confCount2}</strong> 張`;
+}
+
+function confirmCurrent() {
+  saveCurrentEdit();
+  const inv = invoices[currentIndex];
+  inv.confirmed = true;
+  // Update thumbnail confirmed badge
+  const thumb = document.getElementById(`thumb-${currentIndex}`);
+  if (thumb && !thumb.querySelector('.confirmed-badge')) {
+    const cb = document.createElement('div');
+    cb.className = 'confirmed-badge'; cb.textContent = '✔';
+    thumb.appendChild(cb);
+  }
+  // Update confirm button
+  const btn = document.getElementById('btnConfirm');
+  if (btn) { btn.textContent = '✔ 已確認'; btn.classList.add('confirmed'); }
+  // Update record indicator
+  const confCount = invoices.filter(v => v.confirmed).length;
+  document.getElementById('recordIndicator').innerHTML =
+    `第 <strong>${currentIndex + 1}</strong> / <strong>${invoices.length}</strong> 張　已確認：<strong>${confCount}</strong> 張`;
+  // Auto-advance to next
+  const next = currentIndex + 1;
+  if (next < invoices.length) {
+    currentIndex = next;
+    renderReview(next, true);
+  } else {
+    showToast('所有發票已確認完成！', 'success');
+  }
 }
 
 function resetCurrentEdit() {
