@@ -398,6 +398,18 @@ html, body { height: 100%; font-family: 'Segoe UI', 'Microsoft JhengHei', sans-s
   color: var(--accent); cursor: pointer; text-decoration: underline;
   font-size: 10px;
 }
+.val-error {
+  margin-top: 3px; font-size: 11px; color: #dc2626;
+  display: flex; align-items: center; gap: 4px;
+}
+.val-error::before { content: '✗'; font-weight: 700; }
+.form-input.field-invalid { border-color: #dc2626 !important; background: #fff5f5 !important; }
+.btn-autogen {
+  flex-shrink: 0; padding: 3px 10px; font-size: 11px; border-radius: 5px;
+  border: 1px solid var(--navy); color: var(--navy); background: #fff;
+  cursor: pointer; white-space: nowrap; line-height: 1.4;
+}
+.btn-autogen:hover { background: var(--navy); color: #fff; }
 
 .form-divider {
   grid-column: 1/-1; border: none; border-top: 1px solid var(--border); margin: 4px 0;
@@ -405,14 +417,18 @@ html, body { height: 100%; font-family: 'Segoe UI', 'Microsoft JhengHei', sans-s
 
 .confirm-bar {
   padding: 10px 0 4px 0;
-  display: flex; justify-content: flex-end;
+  display: flex;
   grid-column: 1 / -1;
 }
 .btn-confirm {
   background: var(--navy); color: #fff;
-  padding: 9px 36px; border-radius: 8px; border: none;
+  width: 100%; padding: 9px 0; border-radius: 8px; border: none;
   font-size: 14px; font-weight: 700; cursor: pointer;
   transition: background .15s, box-shadow .15s;
+}
+.btn-confirm:focus {
+  outline: 3px solid #facc15; outline-offset: 2px;
+  box-shadow: 0 0 0 5px rgba(250,204,21,.35);
 }
 .btn-confirm:hover { background: var(--navy-hover); box-shadow: 0 4px 12px rgba(15,32,68,.3); }
 .btn-confirm.confirmed { background: var(--success); }
@@ -810,6 +826,114 @@ const FIELDS = [
 // ===================================================================
 const BUYERS = ['全家便利商店股份有限公司','統一超商股份有限公司','好市多股份有限公司','台灣大哥大股份有限公司','玉山銀行股份有限公司'];
 const PREFIXES = ['PT','RE','AN','BQ','CW','DZ','EK','FJ'];
+
+// ===================================================================
+//  VALIDATION
+// ===================================================================
+const VALID_BUYERS = ['全家便利商店股份有限公司','全家便利商店(股)公司','全家便利商店有限公司'];
+
+function validateUBN(ubn) {
+  if (!/^\d{8}$/.test(ubn)) return false;
+  const w = [1,2,1,2,1,2,4,1];
+  const d = ubn.split('').map(Number);
+  let s = 0;
+  for (let i = 0; i < 8; i++) {
+    const p = d[i] * w[i];
+    s += p >= 10 ? Math.floor(p/10) + (p % 10) : p;
+  }
+  return d[6] === 7 ? s % 10 === 0 : s % 5 === 0;
+}
+
+function numToChinese(n) {
+  n = Math.round(Number(n));
+  if (!n || n <= 0) return '';
+  const CN = ['零','壹','貳','參','肆','伍','陸','柒','捌','玖'];
+  const UN4 = ['仟','佰','拾',''];
+  function seg(num) {
+    let r = '', z = false;
+    const d4 = [Math.floor(num/1000), Math.floor(num/100)%10, Math.floor(num/10)%10, num%10];
+    for (let i = 0; i < 4; i++) {
+      if (d4[i] === 0) { if (r) z = true; }
+      else { if (z) { r += '零'; z = false; } r += CN[d4[i]] + UN4[i]; }
+    }
+    return r;
+  }
+  const yi   = Math.floor(n / 100000000);
+  const wan  = Math.floor((n % 100000000) / 10000);
+  const qian = n % 10000;
+  let res = '';
+  if (yi)   res += seg(yi)  + '億';
+  if (wan)  { if (res && wan  < 1000) res += '零'; res += seg(wan)  + '萬'; }
+  if (qian) { if ((yi||wan) && qian < 1000) res += '零'; res += seg(qian); }
+  return res + '元整';
+}
+
+function getValidationError(key, inv) {
+  const val = (inv.editedData[key] ?? '').trim();
+  switch (key) {
+    case 'invoiceNo':
+      return /^[A-Za-z]{2}-?\d{8}$/.test(val) ? null : '格式應為 2英文＋8數字（如 AB12345678）';
+    case 'buyer':
+      return VALID_BUYERS.includes(val) ? null : '買受人不符合指定公司名稱';
+    case 'buyerUBN':
+      return val === '23060248' ? null : '統編應為 23060248';
+    case 'invoiceDate':
+      return /^\d{7}$/.test(val) ? null : '格式應為民國7碼數字（如 1140701）';
+    case 'sellerUBN':
+      return validateUBN(val) ? null : '統編檢查碼驗證失敗';
+    case 'taxType': {
+      const tax = parseFloat(inv.editedData.taxAmount);
+      const expected = (!isNaN(tax) && tax > 0) ? '應稅' : '免稅';
+      return val === expected ? null : `依稅額應為「${expected}」`;
+    }
+    case 'salesAmount': {
+      const n = parseFloat(val);
+      return (!isNaN(n) && n > 0) ? null : '應為大於 0 的數字';
+    }
+    case 'taxAmount': {
+      const n = parseFloat(val);
+      return (!isNaN(n) && n >= 0) ? null : '應為大於等於 0 的數字';
+    }
+    case 'total': {
+      const s = parseFloat(inv.editedData.salesAmount) || 0;
+      const t = parseFloat(inv.editedData.taxAmount)  || 0;
+      return parseFloat(val) === s + t ? null : `應等於銷售額＋稅額（${s + t}）`;
+    }
+    case 'totalText': {
+      if (!val) return null;
+      return /^[零壹貳參肆伍陸柒捌玖拾佰仟萬億圓元整]+$/.test(val)
+        ? null : '應使用大寫國字（零壹貳參肆伍陸柒捌玖拾佰仟萬億元整）';
+    }
+  }
+  return null;
+}
+
+function updateFieldValidationUI(key, inv) {
+  const input = document.getElementById(`field-${key}`);
+  if (!input) return;
+  const err = getValidationError(key, inv);
+  const fieldCol = input.closest('.field-col');
+  if (!fieldCol) return;
+  // Toggle invalid class on input
+  if (err) input.classList.add('field-invalid');
+  else     input.classList.remove('field-invalid');
+  // Update/create error message div
+  let errDiv = fieldCol.querySelector('.val-error');
+  if (err) {
+    if (!errDiv) { errDiv = document.createElement('div'); errDiv.className = 'val-error'; fieldCol.appendChild(errDiv); }
+    errDiv.textContent = err;
+  } else {
+    if (errDiv) errDiv.remove();
+  }
+}
+
+function generateTotalText() {
+  const inv = invoices[currentIndex];
+  const total = parseFloat(inv.editedData.total) || 0;
+  const text = numToChinese(total);
+  const input = document.getElementById('field-totalText');
+  if (input) { input.value = text; onFieldInput(input); }
+}
 const TAX_TYPES = ['應稅','免稅','零稅率'];
 const SELLER_UBNS = ['04595252','89471616','22099131','70101903','53228922'];
 const BUYER_UBNS  = ['23060248','82088023','19174503','53228922','70815571'];
@@ -1136,36 +1260,43 @@ function renderForm(inv) {
     const editedVal = inv.editedData[f.key] ?? '';
     const ocrVal = inv.ocrData[f.key] ?? '';
     const isModified = editedVal !== ocrVal;
+    const valErr = getValidationError(f.key, inv);
 
     let extraClass = '';
     if (isFailed) extraClass = 'ocr-failed';
     else if (isModified) extraClass = 'user-modified';
+    if (valErr) extraClass += ' field-invalid';
 
     const div = document.createElement('div');
     div.className = 'form-group' + (f.full ? ' full' : '');
 
-    const failHint = isFailed ? `placeholder="辨識失敗，請手動輸入"` : `placeholder="${f.placeholder}"`;
+    const ph = isFailed ? '辨識失敗，請手動輸入' : f.placeholder;
     const compareRow = isModified ? `
       <div class="ocr-compare">
         <span>原始辨識：</span>
         <span class="ocr-val">${ocrVal || '（空白）'}</span>
         <span class="reset-btn" onclick="resetField('${f.key}')">還原</span>
       </div>` : '';
+    const errRow = valErr ? `<div class="val-error">${valErr}</div>` : '';
+    const autoGen = f.key === 'totalText'
+      ? `<button type="button" class="btn-autogen" onclick="generateTotalText()">自動產生</button>` : '';
 
     div.innerHTML = `
-      <label>${f.label}${isFailed ? ' ⚠️' : ''}</label>
+      <label>${f.label}</label>
       <div class="field-col">
         <div class="field-wrap">
           <input class="form-input ${extraClass}" 
                  id="field-${f.key}" 
                  data-key="${f.key}"
                  value="${escHtml(editedVal)}" 
-                 ${failHint}
+                 placeholder="${ph}"
                  oninput="onFieldInput(this)"
                  onfocus="lastFocusedKey=this.dataset.key">
           ${isModified ? `<span class="diff-badge">已修改</span>` : ''}
+          ${autoGen}
         </div>
         ${compareRow}
+        ${errRow}
       </div>
     `;
     grid.appendChild(div);
@@ -1209,6 +1340,11 @@ function onFieldInput(input) {
   const confCount3 = invoices.filter(v => v.confirmed).length;
   document.getElementById('recordIndicator').innerHTML =
     `第 <strong>${currentIndex + 1}</strong> / <strong>${invoices.length}</strong> 張　已確認：<strong>${confCount3}</strong> 張`;
+  // 即時更新本欄驗證
+  updateFieldValidationUI(key, inv);
+  // 連鎖驗證：稅額改動時重新驗證稅別；銷售額/稅額改動時重新驗證總計
+  if (key === 'taxAmount') updateFieldValidationUI('taxType', inv);
+  if (key === 'salesAmount' || key === 'taxAmount') updateFieldValidationUI('total', inv);
 }
 
 function resetField(key) {
@@ -1427,8 +1563,25 @@ document.addEventListener('keydown', e => {
     return true;
   };
 
-  if (e.key === 'Tab' && !e.shiftKey) { if (inField && focused.dataset.key === lastKey) { e.preventDefault(); lastFocusedKey = firstKey; navigate(1); return; } }
-  if (e.key === 'Tab' && e.shiftKey)  { if (inField && focused.dataset.key === firstKey) { e.preventDefault(); lastFocusedKey = lastKey; navigate(-1); return; } }
+  if (e.key === 'Tab' && !e.shiftKey) {
+    // totalText 最後一欄 Tab → 聞焦到確認按鈕
+    if (inField && focused.dataset.key === lastKey) {
+      e.preventDefault();
+      document.getElementById('btnConfirm')?.focus();
+      return;
+    }
+    // 確認按鈕 Tab → 下一張
+    if (document.activeElement?.id === 'btnConfirm') {
+      e.preventDefault(); lastFocusedKey = firstKey; navigate(1); return;
+    }
+  }
+  if (e.key === 'Tab' && e.shiftKey) {
+    // 確認按鈕 Shift+Tab → 返回 totalText
+    if (document.activeElement?.id === 'btnConfirm') {
+      e.preventDefault(); focusField(lastKey); return;
+    }
+    if (inField && focused.dataset.key === firstKey) { e.preventDefault(); lastFocusedKey = lastKey; navigate(-1); return; }
+  }
 
   // ArrowDown / ArrowUp 已交由 capture-phase listener 處理，此處不重複
 
@@ -1445,11 +1598,16 @@ document.addEventListener('keydown', e => {
   if (e.key === 'PageDown') { e.preventDefault(); navigate(1); }
   if (e.key === 'Home')     { e.preventDefault(); navigateTo(0); }
   if (e.key === 'End')      { e.preventDefault(); navigateTo(invoices.length - 1); }
-  // Enter 鍵跳下一張（在輸入欄內或確認按鈕外皆可）
+  // Enter 鍵：確認按鈕已確認時前往下一張；其他情況跳下一張
   if (e.key === 'Enter') {
     const ae = document.activeElement;
     const onConfirmBtn = ae && ae.id === 'btnConfirm';
-    if (!onConfirmBtn) { e.preventDefault(); navigate(1); }
+    if (onConfirmBtn) {
+      if (invoices[currentIndex]?.confirmed) { e.preventDefault(); navigate(1); }
+      // 尚未確認：就讓按鈕預設 onclick 觸發 confirmCurrent()
+    } else {
+      e.preventDefault(); navigate(1);
+    }
   }
 });
 
@@ -1465,15 +1623,26 @@ document.addEventListener('keydown', e => {
   const firstKey = FIELDS[0].key;
   const lastKey  = FIELDS[FIELDS.length - 1].key;
   if (!inField) {
-    if (e.key === 'ArrowDown') focusField(firstKey);
-    else                       focusField(lastKey);
+    // 確認按鈕上：↑返回 totalText，↓前往下一張
+    if (focused?.id === 'btnConfirm') {
+      if (e.key === 'ArrowUp') focusField(lastKey);
+      else { lastFocusedKey = firstKey; navigate(1); }
+    } else {
+      if (e.key === 'ArrowDown') focusField(firstKey);
+      else                       focusField(lastKey);
+    }
     return;
   }
   const keys = FIELDS.map(f => f.key);
   const cur  = keys.indexOf(focused.dataset.key);
   const next = cur + (e.key === 'ArrowDown' ? 1 : -1);
   if (next < 0)                { /* invoiceNo 第一欄按↑：停留在此欄，不換張 */ focusField(firstKey); }
-  else if (next >= keys.length){ lastFocusedKey = firstKey; navigate(1);  }
+  else if (next >= keys.length) {
+    // totalText 最後欄按↓：聞焦到確認按鈕
+    const btn = document.getElementById('btnConfirm');
+    if (btn) btn.focus();
+    else { lastFocusedKey = firstKey; navigate(1); }
+  }
   else                         { focusField(keys[next]); }
 }, { capture: true });
 
