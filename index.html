@@ -560,7 +560,7 @@ kbd {
     <div class="sidebar-logo">
       <div class="logo-icon">📄</div>
       <h1>發票辨識系統</h1>
-      <p>DEMO v1.2</p>
+      <p>DEMO v1.3</p>
     </div>
     <nav class="sidebar-nav">
       <div class="nav-label">功能選單</div>
@@ -1674,7 +1674,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter') {
     const ae = document.activeElement;
     if (ae?.id === 'btnConfirm') {
-      e.preventDefault(); confirmCurrent(); return;
+      e.preventDefault(); confirmCurrent(); navigate(1); return;
     }
     if (inField) {
       e.preventDefault(); handleFieldEnter(ae.dataset.key); return;
@@ -1694,10 +1694,10 @@ document.addEventListener('keydown', e => {
   const firstKey = FIELDS[0].key;
   const lastKey  = FIELDS[FIELDS.length - 1].key;
   if (!inField) {
-    // 確認按鈕上：↑返回 totalText，↓前往下一張
+    // 確認按鈕上：↑返回 totalText，↓不動作
     if (focused?.id === 'btnConfirm') {
       if (e.key === 'ArrowUp') focusField(lastKey);
-      else { lastFocusedKey = firstKey; navigate(1); }
+      // ArrowDown：不動作
     } else {
       if (e.key === 'ArrowDown') focusField(firstKey);
       else                       focusField(lastKey);
