@@ -404,9 +404,9 @@ html, body { height: 100%; font-family: 'Segoe UI', 'Microsoft JhengHei', sans-s
 }
 
 .confirm-bar {
-  padding: 10px 20px;
-  background: var(--card); border-top: 1px solid var(--border);
+  padding: 10px 0 4px 0;
   display: flex; justify-content: flex-end;
+  grid-column: 1 / -1;
 }
 .btn-confirm {
   background: var(--navy); color: #fff;
@@ -687,9 +687,6 @@ kbd {
             <div class="form-grid" id="formGrid">
               <!-- Dynamically rendered -->
             </div>
-          </div>
-          <div class="confirm-bar">
-            <button class="btn-confirm" id="btnConfirm" onclick="confirmCurrent()">✔ 確認此張</button>
           </div>
           <div class="key-hints-bar">
             <kbd>↑</kbd><kbd>↓</kbd> 上/下一欄 &nbsp;·&nbsp;
@@ -1173,6 +1170,13 @@ function renderForm(inv) {
     `;
     grid.appendChild(div);
   });
+
+  // 在 totalText 欄位之後插入確認按鈕列
+  const confirmBar = document.createElement('div');
+  confirmBar.className = 'confirm-bar';
+  const isConfirmed = inv.confirmed;
+  confirmBar.innerHTML = `<button class="btn-confirm${isConfirmed ? ' confirmed' : ''}" id="btnConfirm" onclick="confirmCurrent()">${isConfirmed ? '✔ 已確認' : '✔ 確認此張'}</button>`;
+  grid.appendChild(confirmBar);
 }
 
 function onFieldInput(input) {
@@ -1258,13 +1262,12 @@ function confirmCurrent() {
   const confCount = invoices.filter(v => v.confirmed).length;
   document.getElementById('recordIndicator').innerHTML =
     `第 <strong>${currentIndex + 1}</strong> / <strong>${invoices.length}</strong> 張　已確認：<strong>${confCount}</strong> 張`;
-  // Auto-advance to next
-  const next = currentIndex + 1;
-  if (next < invoices.length) {
-    currentIndex = next;
-    renderReview(next, true);
-  } else {
+  // 確認後停留在此張，顯示提示
+  const remaining = invoices.filter(v => !v.confirmed).length;
+  if (remaining === 0) {
     showToast('所有發票已確認完成！', 'success');
+  } else {
+    showToast(`已確認，按 Enter 前往下一張`, 'info');
   }
 }
 
@@ -1442,6 +1445,12 @@ document.addEventListener('keydown', e => {
   if (e.key === 'PageDown') { e.preventDefault(); navigate(1); }
   if (e.key === 'Home')     { e.preventDefault(); navigateTo(0); }
   if (e.key === 'End')      { e.preventDefault(); navigateTo(invoices.length - 1); }
+  // Enter 鍵跳下一張（在輸入欄內或確認按鈕外皆可）
+  if (e.key === 'Enter') {
+    const ae = document.activeElement;
+    const onConfirmBtn = ae && ae.id === 'btnConfirm';
+    if (!onConfirmBtn) { e.preventDefault(); navigate(1); }
+  }
 });
 
 // ===================================================================
@@ -1463,7 +1472,7 @@ document.addEventListener('keydown', e => {
   const keys = FIELDS.map(f => f.key);
   const cur  = keys.indexOf(focused.dataset.key);
   const next = cur + (e.key === 'ArrowDown' ? 1 : -1);
-  if (next < 0)                { lastFocusedKey = lastKey;  navigate(-1); }
+  if (next < 0)                { /* invoiceNo 第一欄按↑：停留在此欄，不換張 */ focusField(firstKey); }
   else if (next >= keys.length){ lastFocusedKey = firstKey; navigate(1);  }
   else                         { focusField(keys[next]); }
 }, { capture: true });
