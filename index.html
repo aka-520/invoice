@@ -753,6 +753,29 @@ let invoices = [];         // Processed invoice records
 let currentIndex = 0;
 let processingActive = false;
 
+// ===================================================================
+//  DEMO OCR DATA (real invoice data matching ./inv_image/ filenames)
+// ===================================================================
+const DEMO_OCR_DATA = {
+  'MW04563834': { invoiceNo: 'MW04563834', buyer: '全家便利商店股份有限公司', buyerUBN: '23060248', invoiceDate: '1140630', storeNo: '024368', sellerUBN: '53060316', taxType: '應稅', salesAmount: '210000', taxAmount: '', total: '210000', totalText: '' },
+  'QU26106326': { invoiceNo: 'QU26106326', buyer: '全家便利商店股份有限公司', buyerUBN: '23060248', invoiceDate: '1140701', storeNo: '024679', sellerUBN: '03374306', taxType: '應稅', salesAmount: '142857', taxAmount: '7143', total: '150000', totalText: '' },
+  'QF-04489873': { invoiceNo: 'QF-04489873', buyer: '全家便利商店股份有限公司', buyerUBN: '23060248', invoiceDate: '1140703', storeNo: '', sellerUBN: '27950876', taxType: '應稅', salesAmount: '1406918', taxAmount: '70346', total: '1477264', totalText: '' },
+  'QZ49856311': { invoiceNo: 'QZ49856311', buyer: '', buyerUBN: '23060248', invoiceDate: '1140706', storeNo: '01P335', sellerUBN: '88505504', taxType: '應稅', salesAmount: '61905', taxAmount: '3095', total: '65000', totalText: '' },
+  'PT18629502': { invoiceNo: 'PT18629502', buyer: '全家便利商店股份有限公司', buyerUBN: '23060248', invoiceDate: '1140704', storeNo: '017442', sellerUBN: '16677056', taxType: '應稅', salesAmount: '83810', taxAmount: '4190', total: '88000', totalText: '捌萬捌仟元' },
+  'PT28595350': { invoiceNo: 'PT28595350', buyer: '全家便利商店股份有限公司', buyerUBN: '23060248', invoiceDate: '1140701', storeNo: '014285', sellerUBN: '12305386', taxType: '應稅', salesAmount: '11000', taxAmount: '550', total: '11550', totalText: '壹萬壹仟伍百伍拾元' },
+  'MT32189116': { invoiceNo: 'MT32189116', buyer: '全家便利商店股份有限公司', buyerUBN: '23060248', invoiceDate: '114年5-6月', storeNo: '024490', sellerUBN: '27729572', taxType: '應稅', salesAmount: '41905', taxAmount: '2095', total: '44000', totalText: '肆萬肆仟元整' },
+  'MT53989106': { invoiceNo: 'MT53989106', buyer: '全家便利商店股份有限公司', buyerUBN: '23060248', invoiceDate: '1140601', storeNo: '021447', sellerUBN: '22642339', taxType: '應稅', salesAmount: '72886', taxAmount: '3644', total: '76530', totalText: '柒萬陸仟伍佰參拾零元' },
+  'PT07799401': { invoiceNo: 'PT07799401', buyer: '全家便利商店(股)公司', buyerUBN: '23060248', invoiceDate: '1140703', storeNo: '022885', sellerUBN: '12831085', taxType: '應稅', salesAmount: '291429', taxAmount: '14571', total: '306000', totalText: '參拾萬陸仟元整' },
+  'PT02108901': { invoiceNo: 'PT02108901', buyer: '全家便利商店股份有限公司', buyerUBN: '23050248', invoiceDate: '1140706', storeNo: '018459', sellerUBN: '88070557', taxType: '應稅', salesAmount: '93662', taxAmount: '4683', total: '98345', totalText: '玖萬捌仟參佰肆拾伍元' },
+  'PT56685100': { invoiceNo: 'PT56685100', buyer: '全家便利商店有限公司', buyerUBN: '23060248', invoiceDate: '1140730', storeNo: '014657', sellerUBN: '80381712', taxType: '應稅', salesAmount: '240952', taxAmount: '12048', total: '253000', totalText: '貳拾伍萬參仟元整' },
+  'PT52749110': { invoiceNo: 'PT52749110', buyer: '全家便利商店股份有限公司', buyerUBN: '23060248', invoiceDate: '1140804', storeNo: '019902', sellerUBN: '53735071', taxType: '應稅', salesAmount: '1970', taxAmount: '99', total: '2069', totalText: '貳仟零陸拾玖元' },
+  'PT45698050': { invoiceNo: 'PT45698050', buyer: '全國便利商店股份有限公司', buyerUBN: '23060248', invoiceDate: '1140704', storeNo: '021626', sellerUBN: '80551568', taxType: '應稅', salesAmount: '115657', taxAmount: '5783', total: '121440', totalText: '壹拾貳萬壹仟肆佰肆拾元' },
+  'PT17039501': { invoiceNo: 'PT17039501', buyer: '全家便利商店股份有限公司', buyerUBN: '23060248', invoiceDate: '1140704', storeNo: '023098', sellerUBN: '28145175', taxType: '應稅', salesAmount: '120000', taxAmount: '6000', total: '126000', totalText: '壹拾伍萬陸仟零零零元' },
+  'MU21885019': { invoiceNo: 'MU21885019', buyer: '天主教靜宜大學', buyerUBN: '39685542', invoiceDate: '1140625', storeNo: '', sellerUBN: '23060248', taxType: '應稅', salesAmount: '1107143', taxAmount: '55357', total: '1162500', totalText: '' },
+  'PT51636651': { invoiceNo: 'PT51636651', buyer: '全家便利商店股份有限公司', buyerUBN: '23060248', invoiceDate: '1140704', storeNo: '023410', sellerUBN: '23429125', taxType: '應稅', salesAmount: '123810', taxAmount: '6190', total: '130000', totalText: '壹拾參元整' },
+  'PT00013203': { invoiceNo: 'PT00013203', buyer: '全家便利商店股份有限公司', buyerUBN: '23060248', invoiceDate: '1140705', storeNo: '', sellerUBN: '93512435', taxType: '應稅', salesAmount: '171429', taxAmount: '8571', total: '180000', totalText: '壹拾萬' },
+};
+
 const FIELDS = [
   { key: 'invoiceNo',     label: '發票字軌及號碼',      placeholder: 'AB-12345678',    full: false },
   { key: 'buyer',         label: '買受人',              placeholder: '○○股份有限公司', full: false },
@@ -899,43 +922,26 @@ function clearFiles() {
   document.getElementById('dirInput').value = '';
 }
 
-// Demo mode: generate placeholder colored canvases
-function loadDemoFiles() {
-  const colors = ['#c7d9f0','#fde8c8','#d4f0d4','#f0d4d4','#e8d4f0','#f0f0d4','#d4e8f0','#f0d4e8'];
-  const names = [
-    'INV_2025001.jpg','INV_2025002.jpg','INV_2025003.jpg',
-    'INV_2025004.jpg','INV_2025005.jpg','INV_2025006.jpg',
-    'INV_2025007.jpg','INV_2025008.jpg',
-  ];
-  selectedFiles = [];
-  const promises = names.map((name, i) => {
-    return new Promise(resolve => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 400; canvas.height = 560;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = colors[i % colors.length];
-      ctx.fillRect(0, 0, 400, 560);
-      ctx.fillStyle = '#333';
-      ctx.font = 'bold 18px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('統一發票', 200, 60);
-      ctx.font = '14px sans-serif';
-      ctx.fillText(`字軌號碼: ${PREFIXES[i]}${String(10000000+i*13579).slice(0,8)}`, 200, 100);
-      ctx.fillText(`日期: 114年${String(i%12+1).padStart(2,'0')}月15日`, 200, 130);
-      ctx.fillText(`買受人: ${BUYERS[i%BUYERS.length].slice(0,8)}`, 200, 160);
-      ctx.fillText(`銷售額: ${(i+1)*8000}`, 200, 190);
-      ctx.fillText('—— DEMO INVOICE ——', 200, 480);
-      canvas.toBlob(blob => {
-        const file = new File([blob], name, { type: 'image/jpeg' });
-        resolve(file);
-      }, 'image/jpeg', 0.85);
-    });
+// Demo mode: load real invoice images from ./inv_image/
+async function loadDemoFiles() {
+  const names = Object.keys(DEMO_OCR_DATA);
+  const filePromises = names.map(async (name) => {
+    try {
+      const resp = await fetch(`./inv_image/${name}.png`);
+      if (!resp.ok) return null;
+      const blob = await resp.blob();
+      const file = new File([blob], `${name}.png`, { type: 'image/png' });
+      file._demoOcr = DEMO_OCR_DATA[name];
+      return file;
+    } catch {
+      return null;
+    }
   });
-  Promise.all(promises).then(files => {
-    selectedFiles = files;
-    renderPreview();
-    showToast(`已載入 ${files.length} 張 DEMO 範例圖片`, 'success');
-  });
+  const files = (await Promise.all(filePromises)).filter(f => f !== null);
+  if (files.length === 0) { showToast('找不到 inv_image 資料夾中的圖片', 'error'); return; }
+  selectedFiles = files;
+  renderPreview();
+  showToast(`已載入 ${files.length} 張 DEMO 發票圖片`, 'success');
 }
 
 // ===================================================================
@@ -967,8 +973,16 @@ async function startProcessing() {
     await sleep(delay);
     processTimes.push(delay);
 
-    const ocrRaw = generateMockOCR();
-    const { data, status, failedFields } = simulateFailure(ocrRaw);
+    let data, status, failedFields;
+    if (f._demoOcr) {
+      data = { ...f._demoOcr };
+      failedFields = FIELDS.map(fd => fd.key).filter(k => data[k] === '');
+      status = failedFields.length > 0 ? 'partial' : 'success';
+    } else {
+      const ocrRaw = generateMockOCR();
+      const result = simulateFailure(ocrRaw);
+      data = result.data; status = result.status; failedFields = result.failedFields;
+    }
     const imageUrl = URL.createObjectURL(f);
 
     invoices.push({
