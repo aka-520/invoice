@@ -652,22 +652,17 @@ kbd {
         <!-- Form panel -->
         <div class="form-panel">
           <div class="form-panel-header">
-            <h3>辨識結果（可編輯）</h3>
+            <span class="record-indicator" id="recordIndicator">—</span>
             <span class="status-pill" id="statusPill">—</span>
-            <button class="btn btn-secondary" style="padding:4px 12px;font-size:12px" onclick="resetCurrentEdit()">↩ 還原辨識值</button>
+            <button class="btn btn-secondary" id="btnPrev2" onclick="navigate(-1)">◀ 上一張</button>
+            <button class="btn btn-secondary" id="btnNext2" onclick="navigate(1)">下一張 ▶</button>
+            <button class="btn btn-success" onclick="exportExcel()">📊 匯出 Excel</button>
           </div>
 
           <div class="form-scroll">
             <div class="form-grid" id="formGrid">
               <!-- Dynamically rendered -->
             </div>
-          </div>
-
-          <div class="form-panel-footer">
-            <span class="record-indicator" id="recordIndicator">—</span>
-            <button class="btn btn-secondary" id="btnPrev2" onclick="navigate(-1)">◀ 上一張</button>
-            <button class="btn btn-secondary" id="btnNext2" onclick="navigate(1)">下一張 ▶</button>
-            <button class="btn btn-success" onclick="exportExcel()">📊 匯出 Excel</button>
           </div>
           <div class="key-hints-bar">
             <kbd>↑</kbd><kbd>↓</kbd> 上/下一欄 &nbsp;·&nbsp;
@@ -677,11 +672,7 @@ kbd {
             <kbd>PageUp</kbd> 上一張 &nbsp;·&nbsp;
             <kbd>Home</kbd> 第一張 &nbsp;·&nbsp;
             <kbd>End</kbd> 最後一張 &nbsp;·&nbsp;
-            <kbd>Esc</kbd> 還原欄位 &nbsp;·&nbsp;
-            <kbd>Ctrl</kbd>+<kbd>E</kbd> 匯出 &nbsp;·&nbsp;
-            <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> 全部還原 &nbsp;·&nbsp;
-            <kbd>F1</kbd> 說明 &nbsp;·&nbsp;
-            <span class="hint-auto-save">✦ 修改後自動儲存</span>
+            <kbd>Esc</kbd> 還原欄位
           </div>
         </div>
       </div>
