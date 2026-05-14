@@ -706,13 +706,12 @@ kbd {
           </div>
           <div class="key-hints-bar">
             <kbd>↑</kbd><kbd>↓</kbd> 上/下一欄 &nbsp;·&nbsp;
-            <kbd>Tab</kbd> 下一欄 &nbsp;·&nbsp;
-            <kbd>Shift</kbd>+<kbd>Tab</kbd> 上一欄 &nbsp;·&nbsp;
             <kbd>PageDown</kbd> 下一張 &nbsp;·&nbsp;
             <kbd>PageUp</kbd> 上一張 &nbsp;·&nbsp;
             <kbd>Home</kbd> 第一張 &nbsp;·&nbsp;
             <kbd>End</kbd> 最後一張 &nbsp;·&nbsp;
-            <kbd>Esc</kbd> 還原欄位
+            <kbd>Esc</kbd> 還原欄位 &nbsp;·&nbsp;
+            <kbd>Enter</kbd> 自動修正 / 確認彌下一張
           </div>
         </div>
       </div>
@@ -880,6 +879,8 @@ function getValidationError(key, inv) {
       return val === '23060248' ? null : '統編應為 23060248';
     case 'invoiceDate':
       return /^\d{7}$/.test(val) ? null : '格式應為民國7碼數字（如 1140701）';
+    case 'storeNo':
+      return /^\d{6}$/.test(val) ? null : '應為6碼數字';
     case 'sellerUBN':
       return validateUBN(val) ? null : '統編檢查碼驗證失敗';
     case 'taxType': {
@@ -926,6 +927,39 @@ function updateFieldValidationUI(key, inv) {
   } else {
     if (errDiv) errDiv.remove();
   }
+}
+
+function handleFieldEnter(key) {
+  const inv = invoices[currentIndex];
+  const input = document.getElementById(`field-${key}`);
+  if (!input) return;
+  let changed = false;
+  switch (key) {
+    case 'buyer':
+      input.value = '全家便利商店股份有限公司'; changed = true; break;
+    case 'buyerUBN':
+      input.value = '23060248'; changed = true; break;
+    case 'taxType': {
+      const tax = parseFloat(inv.editedData.taxAmount);
+      input.value = (!isNaN(tax) && tax > 0) ? '應稅' : '免稅';
+      changed = true; break;
+    }
+    case 'taxAmount': {
+      const tot = parseFloat(inv.editedData.total);
+      const s   = parseFloat(inv.editedData.salesAmount);
+      if (!isNaN(tot) && !isNaN(s)) { input.value = String(Math.max(0, tot - s)); changed = true; }
+      break;
+    }
+    case 'total': {
+      const s = parseFloat(inv.editedData.salesAmount);
+      const t = parseFloat(inv.editedData.taxAmount);
+      if (!isNaN(s) && !isNaN(t)) { input.value = String(s + t); changed = true; }
+      break;
+    }
+    case 'totalText':
+      generateTotalText(); return;
+  }
+  if (changed) onFieldInput(input);
 }
 
 function generateTotalText() {
@@ -1283,8 +1317,7 @@ function renderForm(inv) {
         <span class="reset-btn" onclick="resetField('${f.key}')">還原</span>
       </div>` : '';
     const errRow = valErr ? `<div class="val-error">${valErr}</div>` : '';
-    const autoGen = f.key === 'totalText'
-      ? `<button type="button" class="btn-autogen" onclick="generateTotalText()">自動產生</button>` : '';
+    const autoGen = '';
 
     div.innerHTML = `
       <label>${f.label}</label>
@@ -1403,12 +1436,13 @@ function confirmCurrent() {
   const confCount = invoices.filter(v => v.confirmed).length;
   document.getElementById('recordIndicator').innerHTML =
     `第 <strong>${currentIndex + 1}</strong> / <strong>${invoices.length}</strong> 張　已確認：<strong>${confCount}</strong> 張`;
-  // 確認後停留在此張，顯示提示
-  const remaining = invoices.filter(v => !v.confirmed).length;
-  if (remaining === 0) {
-    showToast('所有發票已確認完成！', 'success');
+  // Auto-advance to next
+  const next = currentIndex + 1;
+  if (next < invoices.length) {
+    currentIndex = next;
+    renderReview(next, true);
   } else {
-    showToast(`已確認，按 Enter 前往下一張`, 'info');
+    showToast('所有發票已確認完成！', 'success');
   }
 }
 
@@ -1611,9 +1645,9 @@ document.addEventListener('keydown', e => {
       document.getElementById('btnConfirm')?.focus();
       return;
     }
-    // 確認按鈕 Tab → 下一張
+    // 確認按鈕 Tab → 循環回第一欄
     if (document.activeElement?.id === 'btnConfirm') {
-      e.preventDefault(); lastFocusedKey = firstKey; navigate(1); return;
+      e.preventDefault(); focusField(firstKey); return;
     }
   }
   if (e.key === 'Tab' && e.shiftKey) {
@@ -1621,7 +1655,7 @@ document.addEventListener('keydown', e => {
     if (document.activeElement?.id === 'btnConfirm') {
       e.preventDefault(); focusField(lastKey); return;
     }
-    if (inField && focused.dataset.key === firstKey) { e.preventDefault(); lastFocusedKey = lastKey; navigate(-1); return; }
+    if (inField && focused.dataset.key === firstKey) { e.preventDefault(); document.getElementById('btnConfirm')?.focus(); return; }
   }
 
   // ArrowDown / ArrowUp 已交由 capture-phase listener 處理，此處不重複
@@ -1639,15 +1673,14 @@ document.addEventListener('keydown', e => {
   if (e.key === 'PageDown') { e.preventDefault(); navigate(1); }
   if (e.key === 'Home')     { e.preventDefault(); navigateTo(0); }
   if (e.key === 'End')      { e.preventDefault(); navigateTo(invoices.length - 1); }
-  // Enter 鍵：確認按鈕已確認時前往下一張；其他情況跳下一張
+  // Enter 鍵：確認按鈕→確認並跳下一張；欄位內→自動修正；其他→不動
   if (e.key === 'Enter') {
     const ae = document.activeElement;
-    const onConfirmBtn = ae && ae.id === 'btnConfirm';
-    if (onConfirmBtn) {
-      if (invoices[currentIndex]?.confirmed) { e.preventDefault(); navigate(1); }
-      // 尚未確認：就讓按鈕預設 onclick 觸發 confirmCurrent()
-    } else {
-      e.preventDefault(); navigate(1);
+    if (ae?.id === 'btnConfirm') {
+      e.preventDefault(); confirmCurrent(); return;
+    }
+    if (inField) {
+      e.preventDefault(); handleFieldEnter(ae.dataset.key); return;
     }
   }
 });
