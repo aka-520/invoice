@@ -711,7 +711,7 @@ kbd {
             <kbd>Home</kbd> 第一張 &nbsp;·&nbsp;
             <kbd>End</kbd> 最後一張 &nbsp;·&nbsp;
             <kbd>Esc</kbd> 還原欄位 &nbsp;·&nbsp;
-            <kbd>Enter</kbd> 自動修正 / 確認彌下一張
+            <kbd>Enter</kbd> 自動修正 / 確認此張 &nbsp;·&nbsp;
           </div>
         </div>
       </div>
@@ -1436,12 +1436,9 @@ function confirmCurrent() {
   const confCount = invoices.filter(v => v.confirmed).length;
   document.getElementById('recordIndicator').innerHTML =
     `第 <strong>${currentIndex + 1}</strong> / <strong>${invoices.length}</strong> 張　已確認：<strong>${confCount}</strong> 張`;
-  // Auto-advance to next
-  const next = currentIndex + 1;
-  if (next < invoices.length) {
-    currentIndex = next;
-    renderReview(next, true);
-  } else {
+  // 確認後停留在此張
+  const remaining = invoices.filter(v => !v.confirmed).length;
+  if (remaining === 0) {
     showToast('所有發票已確認完成！', 'success');
   }
 }
