@@ -783,6 +783,7 @@ let selectedFiles = [];    // File objects
 let invoices = [];         // Processed invoice records
 let currentIndex = 0;
 let processingActive = false;
+let batchInfo = null;      // { startTime, endTime, fileCount }
 
 // ===================================================================
 //  DEMO OCR DATA (real invoice data matching ./inv_image/ filenames)
@@ -1090,6 +1091,7 @@ async function startProcessing() {
   if (selectedFiles.length === 0) return;
   invoices = [];
   processingActive = true;
+  batchInfo = { startTime: new Date(), endTime: null, fileCount: selectedFiles.length };
   goToScreen('progress');
 
   const total = selectedFiles.length;
@@ -1133,6 +1135,8 @@ async function startProcessing() {
       failedFields,
       modified: false,
       confirmed: false,
+      ocrTime: new Date(),
+      confirmedAt: null,
     });
 
     if (status === 'success') cntSuccess++;
@@ -1159,6 +1163,7 @@ async function startProcessing() {
   document.getElementById('currentFile').textContent = '辨識完成！';
   document.getElementById('scanAnim').textContent = '✅';
   document.getElementById('timeEstimate').textContent = `共花費 ${Math.round((Date.now() - startTime)/1000)} 秒`;
+  batchInfo.endTime = new Date();
 
   const badge = document.getElementById('nav-badge-review');
   badge.textContent = total;
@@ -1384,7 +1389,7 @@ function confirmCurrent() {
   saveCurrentEdit();
   const inv = invoices[currentIndex];
   inv.confirmed = true;
-  // Update thumbnail confirmed badge
+  inv.confirmedAt = new Date();
   const thumb = document.getElementById(`thumb-${currentIndex}`);
   if (thumb && !thumb.querySelector('.confirmed-badge')) {
     const cb = document.createElement('div');
@@ -1434,6 +1439,12 @@ function navigateTo(idx) {
 // ===================================================================
 //  EXCEL EXPORT
 // ===================================================================
+function fmtDateTime(d) {
+  if (!d) return '';
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
 function exportExcel() {
   if (invoices.length === 0) { showToast('尚無資料可匯出', 'error'); return; }
   saveCurrentEdit();
@@ -1441,6 +1452,8 @@ function exportExcel() {
   const headers = FIELDS.map(f => f.label);
   const statusHeader = '辨識狀態';
   const modifiedHeader = '是否手動修改';
+  const ocrTimeHeader = '辨識完成時間';
+  const confTimeHeader = '確認時間';
 
   const statusLabel = { success: '辨識成功', partial: '部分辨識失敗', failed: '辨識失敗' };
 
@@ -1449,6 +1462,7 @@ function exportExcel() {
     const row = {};
     FIELDS.forEach(f => { row[f.label] = inv.ocrData[f.key] ?? ''; });
     row[statusHeader] = statusLabel[inv.status] || '';
+    row[ocrTimeHeader] = fmtDateTime(inv.ocrTime);
     return row;
   });
 
@@ -1458,18 +1472,45 @@ function exportExcel() {
     FIELDS.forEach(f => { row[f.label] = inv.editedData[f.key] ?? ''; });
     row[statusHeader] = statusLabel[inv.status] || '';
     row[modifiedHeader] = inv.modified ? '是' : '否';
+    row[ocrTimeHeader] = fmtDateTime(inv.ocrTime);
+    row[confTimeHeader] = fmtDateTime(inv.confirmedAt);
     return row;
   });
 
   const wb = XLSX.utils.book_new();
 
-  const ws1 = XLSX.utils.json_to_sheet(ocrRows, { header: [...headers, statusHeader] });
+  const ws1 = XLSX.utils.json_to_sheet(ocrRows, { header: [...headers, statusHeader, ocrTimeHeader] });
   styleSheet(ws1, invoices.length);
   XLSX.utils.book_append_sheet(wb, ws1, '辨識原始資料');
 
-  const ws2 = XLSX.utils.json_to_sheet(editedRows, { header: [...headers, statusHeader, modifiedHeader] });
+  const ws2 = XLSX.utils.json_to_sheet(editedRows, { header: [...headers, statusHeader, modifiedHeader, ocrTimeHeader, confTimeHeader] });
   styleSheet(ws2, invoices.length);
   XLSX.utils.book_append_sheet(wb, ws2, '修改後資料');
+
+  // Sheet 3: Batch info
+  const batchRows = [];
+  if (batchInfo) {
+    batchRows.push({ '項目': '批次上傳開始時間', '內容': fmtDateTime(batchInfo.startTime) });
+    batchRows.push({ '項目': '批次辨識完成時間', '內容': fmtDateTime(batchInfo.endTime) });
+    const dur = batchInfo.endTime && batchInfo.startTime
+      ? Math.round((batchInfo.endTime - batchInfo.startTime) / 1000) + ' 秒'
+      : '';
+    batchRows.push({ '項目': '辨識耗時', '內容': dur });
+    batchRows.push({ '項目': '發票張數', '內容': String(batchInfo.fileCount) });
+    batchRows.push({ '項目': '已確認張數', '內容': String(invoices.filter(v => v.confirmed).length) });
+    batchRows.push({ '項目': '', '內容': '' });
+    batchRows.push({ '項目': '發票號碼', '內容': '辨識完成時間', '就是就是': '確認時間' });
+    invoices.forEach(inv => {
+      batchRows.push({
+        '項目': inv.editedData.invoiceNo || inv.ocrData.invoiceNo || inv.file.name,
+        '內容': fmtDateTime(inv.ocrTime),
+        '就是就是': fmtDateTime(inv.confirmedAt),
+      });
+    });
+  }
+  const ws3 = XLSX.utils.json_to_sheet(batchRows, { header: ['項目', '內容', '就是就是'], skipHeader: true });
+  ws3['!cols'] = [{ wch: 22 }, { wch: 22 }, { wch: 22 }];
+  XLSX.utils.book_append_sheet(wb, ws3, '批次資訊');
 
   const now = new Date();
   const ts = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
