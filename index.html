@@ -560,7 +560,7 @@ kbd {
     <div class="sidebar-logo">
       <div class="logo-icon">📄</div>
       <h1>發票辨識系統</h1>
-      <p>DEMO v1.3</p>
+      <p>DEMO v1.4</p>
     </div>
     <nav class="sidebar-nav">
       <div class="nav-label">功能選單</div>
@@ -1436,9 +1436,12 @@ function confirmCurrent() {
   const confCount = invoices.filter(v => v.confirmed).length;
   document.getElementById('recordIndicator').innerHTML =
     `第 <strong>${currentIndex + 1}</strong> / <strong>${invoices.length}</strong> 張　已確認：<strong>${confCount}</strong> 張`;
-  // 確認後停留在此張
-  const remaining = invoices.filter(v => !v.confirmed).length;
-  if (remaining === 0) {
+  // 確認後跳下一張
+  const nextIdx = currentIndex + 1;
+  if (nextIdx < invoices.length) {
+    currentIndex = nextIdx;
+    renderReview(nextIdx, true);
+  } else {
     showToast('所有發票已確認完成！', 'success');
   }
 }
@@ -1674,7 +1677,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter') {
     const ae = document.activeElement;
     if (ae?.id === 'btnConfirm') {
-      e.preventDefault(); confirmCurrent(); navigate(1); return;
+      e.preventDefault(); confirmCurrent(); return;
     }
     if (inField) {
       e.preventDefault(); handleFieldEnter(ae.dataset.key); return;
